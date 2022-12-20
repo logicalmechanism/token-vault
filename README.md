@@ -24,6 +24,14 @@ The complete_build.sh script will auto compile the set of smart contracts based 
 
 Each smart contract may be build individually with the quick-build.sh or build-script.sh scripts located within each contract folder.
 
+### Cloning The Repo
+```bash
+git clone https://github.com/logicalmechanism/token-vault.git
+cd token-vault
+```
+
+Update the start_info.sh with the requried pool and reward information then run the complete_build.sh script. A fully synced testnet node is required.
+
 ### Getting The Payment And Stake Hex
 
 Obtaining the correct hex encoding from a wallet can be done with the precompiled bech32 program contained in the scripts folder or by using a Cardano explorer like cardanoscan.io for example. Unless the stake key is empty then both keys will have a length of 56 characters.
@@ -72,6 +80,8 @@ bfaa385c8eab7bbdc6c98b50413435b3d02b73de3c644e1384b801d4
 The test off-chain code inside the scripts folder is designed to be used sequentially, 00 then 01 etc. The test code expects test wallets to exist inside a folder called wallets located inside the scripts folder. The examples provided assume a reference, collateral, reward, and staker wallet. Please use the testnet faucet to obtain test ADA.
 
 The first step is creating the reference scripts used in the following off-chain code. The next two steps involve registering and delegating the stake address. The third step requires the stake address to have withdrawable rewards. The forth and fifth step involves the time locking and removal of a UTxO from the locking smart contract.
+
+The scripts folder contains two helper scripts, one for displaying the current balances of the wallets and contracts, and another for trading tokens and ADA between wallets. They are not required for smart contract testing but may be helpful.
 
 The time lock script, 04_lockIntoVault.sh, assumes an input in minutes. It will use the function
 
@@ -143,8 +153,16 @@ Script debugging logs:
     Remove Error
 ```
 
+### Connecting To The Testnet
+
+Inside the scripts folder are two files for the paths of the cardano-cli and the node socket. The repo comes assumes the cardano-cli is on path but the testnet socket is contained in some folder. Each testnet has a different testnet magic number. Each test script is designed to reference the testnet.magic file for the testnet number. Please adjust these files accordingly to your personal development environment.
+
 ## Notes
 
 This contract is meant to display the simplicity of a token vault where a user may be rewarding via an off-chain reward mechanism for time locking some UTxO inside the contract. The collection of ADA associated with the tokens inside the contract is then staked to a staking pool where one predefined wallet may be rewarded the staking reward. Any wallet may spend the staking reward but the only destination is the reward address.
 
 The repo contains a .devcontainer for vscode. It will allow the repo to be opened in a container where HLS is available.
+
+```
+Please use this contract at your own risk. Each endpoint has been tested and verified for funcitonality but this code has not be officially audited.
+```

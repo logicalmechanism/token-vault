@@ -6,11 +6,9 @@ export CARDANO_NODE_SOCKET_PATH=$(cat path_to_socket.sh)
 cli=$(cat path_to_cli.sh)
 testnet_magic=$(cat testnet.magic)
 
-
 # Addresses
 sender_address=$(cat wallets/reference-wallet/payment.addr)
 receiver_address=$(cat wallets/staker-wallet/base.addr)
-# receiver_address="addr_test1qrupt9d9ug2ufnrrajp2q7gwvmrtzzgr80p5ug7q8nt4d66hu0s5mnhxh2853wtsgn9gdz6wuqtaqnkv0yk78p474d6qudapqh"
 
 # Define Asset to be printed here
 asset="123000000 754536d891ccd388f00782c2cad71b58ccd962b941de5eb27efdc9dd.696f75"
@@ -53,7 +51,6 @@ FEE=$(${cli} transaction build \
     --tx-out="${token_to_be_traded}" \
     --testnet-magic ${testnet_magic})
 
-    # --tx-out="${change_to_be_traded}" \
 IFS=':' read -ra VALUE <<< "${FEE}"
 IFS=' ' read -ra FEE <<< "${VALUE[1]}"
 FEE=${FEE[1]}
