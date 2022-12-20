@@ -18,7 +18,7 @@ Inside the top level folder is the start_info.json file and the complete_build.s
 }
 ```
 
-The reward public key hash and stake credential is obtained from the hex encoding of the bech32 address with out the network prefix.
+The reward public key hash and stake credential is obtained from the hex encoding of the bech32 address without the network prefix.
 
 The complete_build.sh script will auto compile the set of smart contracts based off the information provided inside the start_info.json file. The auto build function will produce the correct redeemers for staking but the datums for the off-chain code will need to adjusted to a users own test wallets.
 
@@ -69,9 +69,9 @@ bfaa385c8eab7bbdc6c98b50413435b3d02b73de3c644e1384b801d4
 
 ## Usage
 
-The test off-chain code inside the scripts folder is designed to be used sequentially, 00 then 01 etc. The test code expects test wallets to exist inside a folder called wallets. The examples provided assume a reference, collateral, reward, and staker wallet. Please use the testnet faucet to obtain test ADA.
+The test off-chain code inside the scripts folder is designed to be used sequentially, 00 then 01 etc. The test code expects test wallets to exist inside a folder called wallets located inside the scripts folder. The examples provided assume a reference, collateral, reward, and staker wallet. Please use the testnet faucet to obtain test ADA.
 
-The first step is creating the reference scripts used in the following off-chain code. The next two steps involve registering and delegating the stake address. The third step requires the stake address to have withdrawable rewards. The forth and fifth step involves the time locking and removal of a UTxO from the smart contract.
+The first step is creating the reference scripts used in the following off-chain code. The next two steps involve registering and delegating the stake address. The third step requires the stake address to have withdrawable rewards. The forth and fifth step involves the time locking and removal of a UTxO from the locking smart contract.
 
 The time lock script, 04_lockIntoVault.sh, assumes an input in minutes. It will use the function
 
@@ -81,8 +81,9 @@ $(echo `expr $(echo $(date +%s%3N)) + $(echo 0)`)
 
 to calculate the current time in Unix time. It will then use the user input to determine the end time. This information will be placed into the datum file for later use.
 
-The locking script assumes some token. Please update the script for whichever token you wish to lock.
+The locking script assumes some token but it can be adapted for any combination of tokens. The maximum amount of tokens a single UTxO may hold inside this contract has not been tested as it is outside the scope of the project. The contracts are design to lock an NFT or some amount of a fungible token on a single UTxO.
 
+The lock test script assume the token information below. Please update the script for whichever token you wish to lock.
 ```bash
 # token information
 policy_id="f61e1c1d38fc4e5b0734329a4b7b820b76bb8e0729458c153c4248ea"
@@ -95,7 +96,7 @@ asset="${amount} ${policy_id}.${token_name}"
 
 ### Creating The Lock Datum
 
-The locking contract requires a specific datum to work. It requires the public key hash and an optional stake key from a wallet. It also assumes a start and end time.
+The locking contract requires a specific datum to work. It requires the public key hash and an optional stake key from a wallet. It also assumes a start and end time. If the stake key is not present on an address then leave the cdtSc field blank.
 
 ```hs
 data CustomDatumType = CustomDatumType
@@ -144,6 +145,6 @@ Script debugging logs:
 
 ## Notes
 
-This contract is meant to display the simplicity of a token vault where a user may be rewarding for time locking some UTxO inside the contract. The collection of ADA associated with the tokens is then staked to a staking pool where one predefined wallet may be rewarded the staking reward. Any wallet may spend the staking reward but the only destination is the reward address.
+This contract is meant to display the simplicity of a token vault where a user may be rewarding via an off-chain reward mechanism for time locking some UTxO inside the contract. The collection of ADA associated with the tokens inside the contract is then staked to a staking pool where one predefined wallet may be rewarded the staking reward. Any wallet may spend the staking reward but the only destination is the reward address.
 
 The repo contains a .devcontainer for vscode. It will allow the repo to be opened in a container where HLS is available.
