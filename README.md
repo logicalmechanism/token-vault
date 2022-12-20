@@ -1,28 +1,32 @@
 # The Token Vault
 
-A smart contract for locking a UTxO for some specified amount of time and staking ADA collected inside the contract.
+A set of smart contracts for locking a UTxO for some specified amount of time and staking the ADA collected inside the contract.
 
-The locking contract allows for a utxo to be unlocked with a correct signature of the wallet, returning value, and tx validity range. The staking contract is designed for a single specific pool id where the rewards can only be withdrawn to a specific wallet known at compile time.
+The locking contract allows for a UTxO to be unlocked with a correct signature from a wallet, returning the value to the wallet, and having a correct tx validity range with respect to the time lock interval. The staking contract is designed for a single pool id where the rewards can only be withdrawn to a specific wallet known at compile time.
 
 ## Building
 
-Inside the folder is the start_info.json file and the complete_build.sh script. The start information is used to hold the staking pool and reward address information. The example below is for a payment only type of address that does not contain a stake key.
+Inside the top level folder is the start_info.json file and the complete_build.sh script. The start information is used to hold the staking pool and reward address information. The example below is for a payment only type of address that does not contain a stake key.
 
 ```json
 {
-  "__comment1__": "This is the stake pool id",
+  "__comment1__": "This is the stake pool id.",
   "poolId": "8a77ce4ffc0c690419675aa5396df9a38c9cd20e36483d2d2465ce86",
-  "__comment2__": "This is the reward address",
+  "__comment2__": "This is the reward address.",
   "rewardPkh": "a2108b7b1704f9fe12c906096ea1634df8e089c9ccfd651abae4a439",
   "rewardSc": ""
 }
 ```
 
-The reward public key hash and stake credential is obtained from the hex encoding of the bech32 address.
+The reward public key hash and stake credential is obtained from the hex encoding of the bech32 address with out the network prefix.
 
 The complete_build.sh script will auto compile the set of smart contracts based off the information provided inside the start_info.json file. The auto build function will produce the correct redeemers for staking but the datums for the off-chain code will need to adjusted to a users own test wallets.
 
+Each smart contract may be build individually with the quick-build.sh or build-script.sh scripts located within each contract folder.
+
 ### Getting The Payment And Stake Hex
+
+Obtaining the correct hex encoding from a wallet can be done with the precompiled bech32 program contained in the scripts folder or by using a Cardano explorer like cardanoscan.io for example. Unless the stake key is empty then both keys will have a length of 56 characters.
 
 A bech32 payment address:
 ```
@@ -138,10 +142,8 @@ Script debugging logs:
     Remove Error
 ```
 
-
 ## Notes
 
 This contract is meant to display the simplicity of a token vault where a user may be rewarding for time locking some UTxO inside the contract. The collection of ADA associated with the tokens is then staked to a staking pool where one predefined wallet may be rewarded the staking reward. Any wallet may spend the staking reward but the only destination is the reward address.
 
-
-# token-vault
+The repo contains a .devcontainer for vscode. It will allow the repo to be opened in a container where HLS is available.

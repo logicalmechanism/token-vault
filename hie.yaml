@@ -1,0 +1,6 @@
+cradle:
+  cabal:
+    - path: "./stake-contract/src"
+      component: "stake-contract:lib:stake-contract"
+    - path: "./locking-contract/src"
+      component: "locking-contract:lib:locking-contract"
