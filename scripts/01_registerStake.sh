@@ -19,7 +19,7 @@ payee_address=$(cat wallets/seller-wallet/payment.addr)
 # stake address deposit
 stakeAddressDeposit=$(cat tmp/protocol.json | jq -r '.stakeAddressDeposit')
 
-echo stakeAddressDeposit : $stakeAddressDeposit
+echo "stakeAddressDeposit:" $stakeAddressDeposit
 script_address_out="${script_address} + ${stakeAddressDeposit}"
 echo "Register OUTPUT: "${script_address_out}
 #
@@ -37,6 +37,7 @@ if [ "${TXNS}" -eq "0" ]; then
    exit;
 fi
 alltxin=""
+# select utxos with only ada
 TXIN=$(jq -r --arg alltxin "" 'to_entries[] | select(.value.value | length < 2) | .key | . + $alltxin + " --tx-in"' tmp/payee_utxo.json)
 payee_tx_in=${TXIN::-8}
 

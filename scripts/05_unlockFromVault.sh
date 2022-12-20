@@ -20,9 +20,15 @@ script_address=$(${cli} address build --payment-script-file ${lock_path} --stake
 staker_address=$(cat wallets/seller-wallet/payment.addr)
 staker_pkh=$(${cli} address key-hash --payment-verification-key-file wallets/seller-wallet/payment.vkey)
 
-# asset to trade
-asset="1 f61e1c1d38fc4e5b0734329a4b7b820b76bb8e0729458c153c4248ea.5468697349734f6e6553746172746572546f6b656e466f7254657374696e6731"
+# token information
+policy_id="f61e1c1d38fc4e5b0734329a4b7b820b76bb8e0729458c153c4248ea"
+token_name="5468697349734f6e6553746172746572546f6b656e466f7254657374696e6731"
+amount=1
 
+# asset to lock
+asset="${amount} ${policy_id}.${token_name}"
+
+# calculate the min ada
 min_utxo=$(${cli} transaction calculate-min-required-utxo \
     --babbage-era \
     --protocol-params-file tmp/protocol.json \
@@ -78,13 +84,14 @@ alltxin=""
 TXIN=$(jq -r --arg alltxin "" 'keys[] | . + $alltxin + " --tx-in"' tmp/script_utxo.json)
 script_tx_in=${TXIN::-8}
 
+# get script reference tx
 script_ref_utxo=$(${cli} transaction txid --tx-file tmp/tx-reference-utxo.signed)
 
+# define the tx validity range
 slot=$(${cli} query tip --testnet-magic ${testnet_magic} | jq .slot)
 current_slot=$((${slot} - 1))
 final_slot=$((${slot} + 500))
 
-# exit
 echo -e "\033[0;36m Building Tx \033[0m"
 FEE=$(${cli} transaction build \
     --babbage-era \

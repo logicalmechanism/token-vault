@@ -43,12 +43,13 @@ if [ "${TXNS}" -eq "0" ]; then
    exit;
 fi
 alltxin=""
+# select utxos with only ada
 TXIN=$(jq -r --arg alltxin "" 'to_entries[] | select(.value.value | length < 2) | .key | . + $alltxin + " --tx-in"' tmp/payee_utxo.json)
 payee_tx_in=${TXIN::-8}
 
+# get the script reference tx
 script_ref_utxo=$(${cli} transaction txid --tx-file tmp/tx-reference-utxo.signed)
 
-# exit
 echo -e "\033[0;36m Building Tx \033[0m"
 FEE=$(${cli} transaction build \
     --babbage-era \

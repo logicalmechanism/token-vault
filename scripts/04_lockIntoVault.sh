@@ -47,6 +47,7 @@ amount=1
 # asset to lock
 asset="${amount} ${policy_id}.${token_name}"
 
+# calculate the min ada
 min_utxo=$(${cli} transaction calculate-min-required-utxo \
     --babbage-era \
     --protocol-params-file tmp/protocol.json \
@@ -73,6 +74,7 @@ alltxin=""
 TXIN=$(jq -r --arg alltxin "" 'keys[] | . + $alltxin + " --tx-in"' tmp/staker_utxo.json)
 staker_tx_in=${TXIN::-8}
 
+# get script reference tx
 script_ref_utxo=$(${cli} transaction txid --tx-file tmp/tx-reference-utxo.signed)
 
 echo -e "\033[0;36m Building Tx \033[0m"
