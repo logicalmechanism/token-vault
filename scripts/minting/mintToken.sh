@@ -15,11 +15,22 @@ mint_path="policy/policy.script"
 seller_address=$(cat ../wallets/seller-wallet/payment.addr)
 seller_pkh=$(${cli} address key-hash --payment-verification-key-file ../wallets/seller-wallet/payment.vkey)
 
+# increment the slot inside the policy
+currentSlot=$(cat ./policy/policy.script | jq .scripts[0].slot)
+nextSlot=$((${currentSlot} + 1))
+
+# update the starting lock time
+variable=${nextSlot}; jq --argjson variable "$variable" '.scripts[0].slot=$variable' ./policy/policy.script > ./policy/policy-new.script
+mv ./policy/policy-new.script ./policy/policy.script
+
+# create a new policy id
+cardano-cli transaction policyid --script-file ./policy/policy.script > ./policy/policy.id
 
 # pid and tkn
 policy_id=$(cat policy/policy.id)
-token_name=$(echo -n "ThisIsOneStarterTokenForTesting2" | od -A n -t x1 | sed 's/ *//g' | tr -d '\n')
-amount=9223372036854775807
+token_name=$(echo -n "ThisIsOneStarterTokenForTesting0" | od -A n -t x1 | sed 's/ *//g' | tr -d '\n')
+amount=1
+
 # assets
 mint_asset="${amount} ${policy_id}.${token_name}"
 

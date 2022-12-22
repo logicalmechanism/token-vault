@@ -1,10 +1,9 @@
 {
   "type": "all",
-  "scripts":
-  [
+  "scripts": [
     {
       "type": "after",
-      "slot": 1
+      "slot": 20
     },
     {
       "type": "sig",
