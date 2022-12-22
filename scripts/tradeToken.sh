@@ -7,22 +7,21 @@ cli=$(cat path_to_cli.sh)
 testnet_magic=$(cat testnet.magic)
 
 # Addresses
-sender_address=$(cat wallets/reference-wallet/payment.addr)
-receiver_address=$(cat wallets/staker-wallet/base.addr)
+sender_address=$(cat wallets/seller-wallet/payment.addr)
+# receiver_address=$(cat wallets/staker-wallet/base.addr)
+receiver_address="addr_test1qrvnxkaylr4upwxfxctpxpcumj0fl6fdujdc72j8sgpraa9l4gu9er4t0w7udjvt2pqngddn6q4h8h3uv38p8p9cq82qav4lmp"
 
 # Define Asset to be printed here
-asset="123000000 754536d891ccd388f00782c2cad71b58ccd962b941de5eb27efdc9dd.696f75"
+asset="1 f61e1c1d38fc4e5b0734329a4b7b820b76bb8e0729458c153c4248ea.5468697349734f6e6553746172746572546f6b656e466f7254657374696e6731"
 
 min_utxo=$(${cli} transaction calculate-min-required-utxo \
     --babbage-era \
     --protocol-params-file tmp/protocol.json \
-    --tx-out-datum-hash-value 42 \
-    --tx-out="${receiver_address} ${asset}" | tr -dc '0-9')
-change_to_be_traded="${sender_address} + ${min_utxo} + ${asset}"
-token_to_be_traded="${receiver_address} + 8972570926"
+    --tx-out="${receiver_address} + 5000000 + ${asset}" | tr -dc '0-9')
+
+token_to_be_traded="${receiver_address} + ${min_utxo} + ${asset}"
 
 echo -e "\nTrading A Token:\n" ${token_to_be_traded}
-echo -e "\nChange:\n" ${change_to_be_traded}
 #
 # exit
 #
@@ -60,7 +59,7 @@ echo -e "\033[1;32m Fee: \033[0m" $FEE
 #
 echo -e "\033[0;36m Signing \033[0m"
 ${cli} transaction sign \
-    --signing-key-file wallets/reference-wallet/payment.skey \
+    --signing-key-file wallets/seller-wallet/payment.skey \
     --tx-body-file tmp/tx.draft \
     --out-file tmp/tx.signed \
     --testnet-magic ${testnet_magic}
