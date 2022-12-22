@@ -82,9 +82,9 @@ mkValidator datum redeemer context =
       ; let lockTimeInterval = lockBetweenTimeInterval (cdtStartTime datum) (cdtEndTime datum)
       ; let txValidityRange  = ContextsV2.txInfoValidRange info
       ; let a = traceIfFalse "Tx Signer"    $ ContextsV2.txSignedBy info walletPkh                          -- wallet must sign it
-      ; let b = traceIfFalse "Bad In/Out"   $ isNInputs txInputs 1 && isNOutputs contTxOutputs 0            -- single input no cont outputs
-      ; let c = traceIfFalse "Return Value" $ isAddrGettingPaidExactly txOutputs walletAddr validatingValue -- wallet must get the utxo
-      ; let d = traceIfFalse "Time Locking" $ isTxOutsideInterval lockTimeInterval txValidityRange          -- UTxo is not time locked
+      ; let b = traceIfFalse "Bad In/Out"   $ isNInputs txInputs 1 && isNOutputs contTxOutputs 0            -- single input, no cont output
+      ; let c = traceIfFalse "Return Value" $ isAddrGettingPaidExactly txOutputs walletAddr validatingValue -- wallet must get the UTxO
+      ; let d = traceIfFalse "Time Locking" $ isTxOutsideInterval lockTimeInterval txValidityRange          -- UTxO is not time locked
       ;         traceIfFalse "Remove Error" $ all (==(True :: Bool)) [a,b,c,d]
       }
   where
