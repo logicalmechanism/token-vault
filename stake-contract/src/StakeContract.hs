@@ -148,8 +148,6 @@ mkPolicy redeemer' context =
             (PlutusV2.DCertDelegDelegate sc' poolId') -> 
               ( traceIfFalse "Incorrect Stake Key" $ sc     == sc'     ) && -- only this cred can be staked
               ( traceIfFalse "Incorrect Pool Id"   $ poolId == poolId' )    -- must delegate to specific pool id
-    
-            -- any other cert fails but stake registration
             _ -> False                                                      -- any other cert fails but not registration
 -------------------------------------------------------------------------------
 -- | Compile Information

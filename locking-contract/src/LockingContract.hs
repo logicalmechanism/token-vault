@@ -51,11 +51,11 @@ data CustomDatumType = CustomDatumType
   { cdtPkh       :: PlutusV2.PubKeyHash
   -- ^ A payment public key hash.
   , cdtSc        :: PlutusV2.PubKeyHash
-  -- ^ A payment staking credential.
+  -- ^ An optional payment staking credential.
   , cdtStartTime :: Integer
-  -- ^ The starting lock time.
+  -- ^ The starting lock time in milliseconds.
   , cdtEndTime   :: Integer
-  -- ^ The ending lock time.
+  -- ^ The ending lock time in milliseconds.
   }
 PlutusTx.unstableMakeIsData ''CustomDatumType
 -------------------------------------------------------------------------------
@@ -74,6 +74,8 @@ mkValidator datum redeemer context =
 
       A user may remove their staked UTxO if and only if they provide the correct signature,
       receive the validated value, and their validatity range is outside of the time lock interval.
+      The contract is designed for many entry UTxOs but only a single script UTxO to be validated
+      at a time.
       
     -}
     Remove -> do
@@ -82,9 +84,9 @@ mkValidator datum redeemer context =
       ; let lockTimeInterval = lockBetweenTimeInterval (cdtStartTime datum) (cdtEndTime datum)
       ; let txValidityRange  = ContextsV2.txInfoValidRange info
       ; let a = traceIfFalse "Tx Signer"    $ ContextsV2.txSignedBy info walletPkh                          -- wallet must sign it
-      ; let b = traceIfFalse "Bad In/Out"   $ isNInputs txInputs 1 && isNOutputs contTxOutputs 0            -- single input no cont outputs
-      ; let c = traceIfFalse "Return Value" $ isAddrGettingPaidExactly txOutputs walletAddr validatingValue -- wallet must get the utxo
-      ; let d = traceIfFalse "Time Locking" $ isTxOutsideInterval lockTimeInterval txValidityRange          -- UTxo is not time locked
+      ; let b = traceIfFalse "Bad In/Out"   $ isNInputs txInputs 1 && isNOutputs contTxOutputs 0            -- single input, no cont output
+      ; let c = traceIfFalse "Return Value" $ isAddrGettingPaidExactly txOutputs walletAddr validatingValue -- wallet must get the UTxO
+      ; let d = traceIfFalse "Time Locking" $ isTxOutsideInterval lockTimeInterval txValidityRange          -- UTxO is not time locked
       ;         traceIfFalse "Remove Error" $ all (==(True :: Bool)) [a,b,c,d]
       }
   where

@@ -21,8 +21,8 @@ staker_address=$(cat wallets/seller-wallet/payment.addr)
 staker_pkh=$(${cli} address key-hash --payment-verification-key-file wallets/seller-wallet/payment.vkey)
 
 # token information
-policy_id="f61e1c1d38fc4e5b0734329a4b7b820b76bb8e0729458c153c4248ea"
-token_name="5468697349734f6e6553746172746572546f6b656e466f7254657374696e6731"
+policy_id="29554843ec2823b1a3b1bf1abd21b1bb0862d5efa6dea0838c9da0ee"
+token_name="5468697349734f6e6553746172746572546f6b656e466f7254657374696e6730"
 amount=1
 
 # asset to lock
