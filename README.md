@@ -1,6 +1,6 @@
 # The Token Vault
 
-A set of smart contracts for locking a UTxO for some specified amount of time and staking the ADA collected inside the contract.
+A set of smart contracts for locking a UTxO for some specified amount of time and staking the ADA collected inside the contract to a specified stake pool.
 
 The locking contract allows for a UTxO to be unlocked with a correct signature from a wallet, returning the value to the wallet, and having a correct tx validity range with respect to the time lock interval. The staking contract is designed for a single pool id where the rewards can only be withdrawn to a specific wallet known at compile time.
 
@@ -22,15 +22,17 @@ The reward public key hash and stake credential is obtained from the hex encodin
 
 The complete_build.sh script will auto compile the set of smart contracts based off the information provided inside the start_info.json file. The auto build function will produce the correct redeemers for staking but the datums for the off-chain code will need to adjusted to a users own test wallets.
 
-Each smart contract may be build individually with the quick-build.sh or build-script.sh scripts located within each contract folder.
+Each smart contract may be built individually with the quick-build.sh or build-script.sh scripts located within each contract folder. The staking contract is not requried for the locking contract to work.
 
 ### Cloning The Repo
 ```bash
 git clone https://github.com/logicalmechanism/token-vault.git
 cd token-vault
+git fetch --all --recurse-submodules --tags
+git checkout $(curl -s https://api.github.com/repos/logicalmechanism/token-vault/releases/latest | jq -r .tag_name)
 ```
 
-Update the start_info.sh with the requried pool and reward information then run the complete_build.sh script. A fully synced testnet node is required.
+Update the start_info.sh with the requried pool and reward information then run the complete_build.sh script. A fully synced testnet or mainnet node is required.
 
 ### Getting The Payment And Stake Hex
 
@@ -46,13 +48,14 @@ The hex encoding is:
 60a2108b7b1704f9fe12c906096ea1634df8e089c9ccfd651abae4a439
 ```
 
-The prefix 60 is the testnet network flag. The resulting public key hash is
+The prefix 60 is the testnet network flag.
 
+The resulting public key hash is
 ```
 a2108b7b1704f9fe12c906096ea1634df8e089c9ccfd651abae4a439
 ```
 
-This type of address does not contain a stake key so that field is left blank at compile time.
+This type of address does not contain a stake key so the field may be left blank.
 
 A bech32 staking address:
 ```
@@ -64,7 +67,7 @@ The hex encoding is:
 00d9335ba4f8ebc0b8c9361613071cdc9e9fe92de49b8f2a4782023ef4bfaa385c8eab7bbdc6c98b50413435b3d02b73de3c644e1384b801d4
 ```
 
-This type of address has a public key hash and a stake credential.
+This type of address has a public key hash and a stake credential. Similar to the payment only address the prefix 00 is the network flag.
 
 The resulting public key hash is
 ```
@@ -81,7 +84,7 @@ The test off-chain code inside the scripts folder is designed to be used sequent
 
 The first step is creating the reference scripts used in the following off-chain code. The next two steps involve registering and delegating the stake address. The third step requires the stake address to have withdrawable rewards. The forth and fifth step involves the time locking and removal of a UTxO from the locking smart contract.
 
-The scripts folder contains two helper scripts, one for displaying the current balances of the wallets and contracts, and another for trading tokens and ADA between wallets. They are not required for smart contract testing but may be helpful.
+The scripts folder contains three helper scripts, one for displaying the current balances of the wallets and contracts, another for trading tokens and ADA between wallets, and the last is finding the time left on a locked UTxO. They are very basic scripts and are not required for smart contract testing but may be helpful.
 
 The time lock script, 04_lockIntoVault.sh, assumes an input in minutes. It will use the function
 
@@ -91,9 +94,10 @@ $(echo `expr $(echo $(date +%s%3N)) + $(echo 0)`)
 
 to calculate the current time in Unix time. It will then use the user input to determine the end time. This information will be placed into the datum file for later use.
 
-The locking script assumes some token but it can be adapted for any combination of tokens. The maximum amount of tokens a single UTxO may hold inside this contract has not been tested as it is outside the scope of the project. The contracts are design to lock an NFT or some amount of a fungible token on a single UTxO.
+The locking script assumes some token but it can be adapted for any combination of tokens. The maximum amount of tokens a single UTxO may hold inside this contract is 19 max name length NFTs, sending more may cause the memory parameter to be greater than the protocol max memory parameters, resulting in a stuck UTxO. Please use caution when sending a large token bundle into the contract.
 
 The lock test script assume the token information below. Please update the script for whichever token you wish to lock.
+
 ```bash
 # token information
 policy_id="f61e1c1d38fc4e5b0734329a4b7b820b76bb8e0729458c153c4248ea"
@@ -115,9 +119,9 @@ data CustomDatumType = CustomDatumType
   , cdtSc        :: PlutusV2.PubKeyHash
   -- ^ A payment staking credential.
   , cdtStartTime :: Integer
-  -- ^ The starting lock time.
+  -- ^ The starting lock time in milliseconds.
   , cdtEndTime   :: Integer
-  -- ^ The ending lock time.
+  -- ^ The ending lock time in milliseconds.
   }
 ```
 
@@ -159,7 +163,7 @@ Inside the scripts folder are two files for the paths of the cardano-cli and the
 
 ## Notes
 
-This contract is meant to display the simplicity of a token vault where a user may be rewarding via an off-chain reward mechanism for time locking some UTxO inside the contract. The collection of ADA associated with the tokens inside the contract is then staked to a staking pool where one predefined wallet may be rewarded the staking reward. Any wallet may spend the staking reward but the only destination is the reward address.
+This contract is meant to display the simplicity of a token vault where a user is rewarded via an off-chain reward mechanism for time locking some UTxO inside the contract. The collection of ADA associated with the tokens inside the contract is then staked to a stake pool where one predefined wallet may be rewarded the staking reward. Any wallet may spend the staking reward but the only destination is the reward address.
 
 The repo contains a .devcontainer for vscode. It will allow the repo to be opened in a container where HLS is available.
 
