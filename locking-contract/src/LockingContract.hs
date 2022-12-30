@@ -53,9 +53,9 @@ data CustomDatumType = CustomDatumType
   , cdtSc        :: PlutusV2.PubKeyHash
   -- ^ A payment staking credential.
   , cdtStartTime :: Integer
-  -- ^ The starting lock time.
+  -- ^ The starting lock time in milliseconds.
   , cdtEndTime   :: Integer
-  -- ^ The ending lock time.
+  -- ^ The ending lock time in milliseconds.
   }
 PlutusTx.unstableMakeIsData ''CustomDatumType
 -------------------------------------------------------------------------------
