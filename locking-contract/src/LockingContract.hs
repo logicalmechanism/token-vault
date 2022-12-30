@@ -74,6 +74,8 @@ mkValidator datum redeemer context =
 
       A user may remove their staked UTxO if and only if they provide the correct signature,
       receive the validated value, and their validatity range is outside of the time lock interval.
+      The contract is designed for many entry UTxOs but only a single script UTxO to be validated
+      at a time.
       
     -}
     Remove -> do
