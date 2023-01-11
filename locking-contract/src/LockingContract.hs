@@ -44,6 +44,89 @@ import           UsefulFuncs
   Author   : The Ancient Kraken
   Copyright: 2022
 -}
+
+
+-------------------------------------------------------------------------------
+-- | Min Max Data Structures
+-------------------------------------------------------------------------------
+data VaultTxOut = VaultTxOut
+  { txOutAddress         :: PlutusV2.Address
+  , txOutValue           :: PlutusV2.Value
+  , txOutDatum           :: PlutusV2.OutputDatum
+  , txOutReferenceScript :: BuiltinData
+  }
+PlutusTx.unstableMakeIsData ''VaultTxOut
+
+data VaultTxInInfo = VaultTxInInfo
+    { txInInfoOutRef   :: BuiltinData
+    , txInInfoResolved :: VaultTxOut
+    } 
+PlutusTx.unstableMakeIsData ''VaultTxInInfo
+
+data VaultTxInfo = VaultTxInfo
+    { txInfoInputs          :: [VaultTxInInfo] -- Transaction inputs
+    , txInfoReferenceInputs :: BuiltinData
+    , txInfoOutputs         :: [VaultTxOut] -- Transaction outputs
+    , txInfoFee             :: BuiltinData
+    , txInfoMint            :: BuiltinData
+    , txInfoDCert           :: BuiltinData
+    , txInfoWdrl            :: BuiltinData
+    , txInfoValidRange      :: PlutusV2.POSIXTimeRange -- The valid range for the transaction.
+    , txInfoSignatories     :: [PlutusV2.PubKeyHash] -- Signatures provided with the transaction, attested that they all signed the tx
+    , txInfoRedeemers       :: BuiltinData
+    , txInfoData            :: BuiltinData
+    , txInfoId              :: BuiltinData
+    }
+PlutusTx.unstableMakeIsData ''VaultTxInfo
+
+data VaultScriptContext = VaultScriptContext
+  { scriptContextTxInfo :: VaultTxInfo
+  , scriptContextPurpose :: BuiltinData
+  }
+PlutusTx.unstableMakeIsData ''VaultScriptContext
+
+-- | Check if a transaction was signed by the given public key.
+txSignedBy' :: VaultTxInfo -> PlutusV2.PubKeyHash -> Bool
+txSignedBy' VaultTxInfo{txInfoSignatories} k = case find ((==) k) txInfoSignatories of
+    Just _  -> True
+    Nothing -> False
+
+-- | Count the number of inputs that have datums of any kind.
+isNInputs' :: [VaultTxInInfo] -> Integer -> Bool
+isNInputs' utxos number = loopInputs utxos 0
+  where
+    loopInputs :: [VaultTxInInfo] -> Integer -> Bool
+    loopInputs []     counter = counter == number
+    loopInputs (x:xs) counter = 
+      case txOutDatum $ txInInfoResolved x of
+        PlutusV2.NoOutputDatum         -> loopInputs xs   counter
+        ( PlutusV2.OutputDatumHash _ ) -> loopInputs xs ( counter + 1 ) -- embedded
+        ( PlutusV2.OutputDatum     _ ) -> loopInputs xs ( counter + 1 ) -- inline
+
+-- | Count the number of outputs that have datums of any kind.
+isNOutputs' :: [VaultTxOut] -> Integer -> Bool
+isNOutputs' utxos number = loopInputs utxos 0
+  where
+    loopInputs :: [VaultTxOut] -> Integer  -> Bool
+    loopInputs []     counter = counter == number
+    loopInputs (x:xs) counter = 
+      case txOutDatum x of
+        PlutusV2.NoOutputDatum         -> loopInputs xs   counter
+        ( PlutusV2.OutputDatumHash _ ) -> loopInputs xs ( counter + 1 ) -- embedded
+        ( PlutusV2.OutputDatum     _ ) -> loopInputs xs ( counter + 1 ) -- inline
+
+-- | Search a list of TxOut for a TxOut with a specific address that is hodling an exact amount of of a singular token. 
+isAddrGettingPaidExactly' :: [VaultTxOut] -> PlutusV2.Address -> PlutusV2.Value -> Bool
+isAddrGettingPaidExactly' []     _    _   = False
+isAddrGettingPaidExactly' (x:xs) addr val
+  | checkAddr && checkVal = True
+  | otherwise             = isAddrGettingPaidExactly' xs addr val
+  where
+    checkAddr :: Bool
+    checkAddr = txOutAddress x == addr
+
+    checkVal :: Bool
+    checkVal = txOutValue x == val     -- must be exact
 -------------------------------------------------------------------------------
 -- | Create the datum parameters data object.
 -------------------------------------------------------------------------------
