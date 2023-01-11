@@ -40,8 +40,9 @@ variable=${endTime}; jq --argjson variable "$variable" '.fields[3].int=$variable
 mv data/datum/stake-datum-new.json data/datum/stake-datum.json
 
 # token information
-policy_id="29554843ec2823b1a3b1bf1abd21b1bb0862d5efa6dea0838c9da0ee"
-token_name="5468697349734f6e6553746172746572546f6b656e466f7254657374696e6730"
+# 1 .
+policy_id="9e70589a8dd23fd55f65198dc9e9a135751690d6bb3a63f7c28389ef"
+token_name="23644d1d72b3dd229bcbef0471a9778dcc60923301704124954cff7bd3e9de04"
 amount=1
 
 # asset to lock

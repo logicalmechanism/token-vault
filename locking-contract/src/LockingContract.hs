@@ -35,13 +35,10 @@ import           Cardano.Api.Shelley            ( PlutusScript (..), PlutusScrip
 import           Codec.Serialise                ( serialise )
 import qualified Data.ByteString.Lazy           as LBS
 import qualified Data.ByteString.Short          as SBS
-import qualified Plutus.V1.Ledger.Scripts       as Scripts
 import qualified Plutus.V2.Ledger.Api           as PlutusV2
-import qualified Plutus.V2.Ledger.Contexts      as ContextsV2
 import           Plutus.Script.Utils.V2.Scripts as Utils
 import           UsefulFuncs
 import qualified Plutonomy
-
 {- |
   Author   : The Ancient Kraken
   Copyright: 2022
@@ -179,10 +176,10 @@ mkValidator datum redeemer context =
       ; let walletAddr       = createAddress walletPkh (cdtSc datum)
       ; let lockTimeInterval = lockBetweenTimeInterval (cdtStartTime datum) (cdtEndTime datum)
       ; let txValidityRange  = txInfoValidRange info
-      ; let a = traceIfFalse "Tx Signer"    $ txSignedBy' info walletPkh                          -- wallet must sign it
-      ; let b = traceIfFalse "Bad In/Out"   $ isNInputs' txInputs 1 && isNOutputs' contTxOutputs 0            -- single input, no cont output
+      ; let a = traceIfFalse "Tx Signer"    $ txSignedBy' info walletPkh                                     -- wallet must sign it
+      ; let b = traceIfFalse "Bad In/Out"   $ isNInputs' txInputs 1 && isNOutputs' contTxOutputs 0           -- single input, no cont output
       ; let c = traceIfFalse "Return Value" $ isAddrGettingPaidExactly' txOutputs walletAddr validatingValue -- wallet must get the UTxO
-      ; let d = traceIfFalse "Time Locking" $ isTxOutsideInterval lockTimeInterval txValidityRange          -- UTxO is not time locked
+      ; let d = traceIfFalse "Time Locking" $ isTxOutsideInterval lockTimeInterval txValidityRange           -- UTxO is not time locked
       ;         traceIfFalse "Remove Error" $ all (==(True :: Bool)) [a,b,c,d]
       }
   where
@@ -206,28 +203,15 @@ mkValidator datum redeemer context =
 -------------------------------------------------------------------------------
 -- | Now we need to compile the Validator.
 -------------------------------------------------------------------------------
-
 wrappedValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
--- wrappedValidator = wrap mkValidator
 wrappedValidator x y z = check (mkValidator (PlutusV2.unsafeFromBuiltinData x) (PlutusV2.unsafeFromBuiltinData y) (PlutusV2.unsafeFromBuiltinData z))
 
 
 validator :: Validator
-validator = Plutonomy.optimizeUPLC $ Plutonomy.validatorToPlutus $ Plutonomy.mkValidatorScript $$(PlutusTx.compile [|| wrappedValidator ||])
-
--- validator' :: PlutusV2.Validator
--- validator' = PlutusV2.mkValidatorScript
---     $$(PlutusTx.compile [|| wrap ||])
---  where
---     wrap = Utils.mkUntypedValidator mkValidator
--------------------------------------------------------------------------------
--- | The code below is required for the plutus script compile.
--------------------------------------------------------------------------------
--- script :: Scripts.Script
--- script = Scripts.unValidatorScript validator'
+-- validator = Plutonomy.optimizeUPLC $ Plutonomy.validatorToPlutus $ Plutonomy.mkValidatorScript $$(PlutusTx.compile [|| wrappedValidator ||])
+validator = Plutonomy.optimizeUPLCWith Plutonomy.aggressiveOptimizerOptions $ Plutonomy.validatorToPlutus $ Plutonomy.mkValidatorScript $$(PlutusTx.compile [|| wrappedValidator ||])
 
 lockingContractScriptShortBs :: SBS.ShortByteString
--- lockingContractScriptShortBs = SBS.toShort . LBS.toStrict $ serialise script
 lockingContractScriptShortBs = SBS.toShort . LBS.toStrict $ serialise validator
 
 lockingContractScript :: PlutusScript PlutusScriptV2
