@@ -40,12 +40,12 @@ import qualified Plutus.V2.Ledger.Api           as PlutusV2
 import qualified Plutus.V2.Ledger.Contexts      as ContextsV2
 import           Plutus.Script.Utils.V2.Scripts as Utils
 import           UsefulFuncs
+import qualified Plutonomy
+
 {- |
   Author   : The Ancient Kraken
   Copyright: 2022
 -}
-
-
 -------------------------------------------------------------------------------
 -- | Min Max Data Structures
 -------------------------------------------------------------------------------
@@ -58,7 +58,7 @@ data VaultTxOut = VaultTxOut
 PlutusTx.unstableMakeIsData ''VaultTxOut
 
 data VaultTxInInfo = VaultTxInInfo
-    { txInInfoOutRef   :: BuiltinData
+    { txInInfoOutRef   :: PlutusV2.TxOutRef
     , txInInfoResolved :: VaultTxOut
     } 
 PlutusTx.unstableMakeIsData ''VaultTxInInfo
@@ -81,9 +81,22 @@ PlutusTx.unstableMakeIsData ''VaultTxInfo
 
 data VaultScriptContext = VaultScriptContext
   { scriptContextTxInfo :: VaultTxInfo
-  , scriptContextPurpose :: BuiltinData
+  , scriptContextPurpose ::  PlutusV2.ScriptPurpose 
   }
 PlutusTx.unstableMakeIsData ''VaultScriptContext
+
+-- | Find the input currently being validated.
+findOwnInput' :: VaultScriptContext -> Maybe VaultTxInInfo
+findOwnInput' VaultScriptContext{scriptContextTxInfo=VaultTxInfo{txInfoInputs}, scriptContextPurpose=PlutusV2.Spending txOutRef} =
+    find (\VaultTxInInfo{txInInfoOutRef} -> txInInfoOutRef == txOutRef) txInfoInputs
+findOwnInput' _ = Nothing
+
+-- | Get all the outputs that pay to the same script address we are currently spending from, if any.
+getContinuingOutputs' :: VaultScriptContext -> [VaultTxOut]
+getContinuingOutputs' ctx | Just VaultTxInInfo{txInInfoResolved=VaultTxOut{txOutAddress}} <- findOwnInput' ctx = filter (f txOutAddress) (txInfoOutputs $ scriptContextTxInfo ctx)
+    where
+        f addr VaultTxOut{txOutAddress=otherAddress} = addr == otherAddress
+getContinuingOutputs' _ = traceError "Lf" -- "Can't get any continuing outputs"
 
 -- | Check if a transaction was signed by the given public key.
 txSignedBy' :: VaultTxInfo -> PlutusV2.PubKeyHash -> Bool
@@ -150,7 +163,7 @@ PlutusTx.makeIsDataIndexed ''CustomRedeemerType [ ( 'Remove, 0 ) ]
 -- | mkValidator :: Datum -> Redeemer -> ScriptContext -> Bool
 -------------------------------------------------------------------------------
 {-# INLINABLE mkValidator #-}
-mkValidator :: CustomDatumType -> CustomRedeemerType -> PlutusV2.ScriptContext -> Bool
+mkValidator :: CustomDatumType -> CustomRedeemerType -> VaultScriptContext -> Bool
 mkValidator datum redeemer context =
   case redeemer of
     {- | Remove
@@ -165,47 +178,57 @@ mkValidator datum redeemer context =
       { let walletPkh        = cdtPkh datum
       ; let walletAddr       = createAddress walletPkh (cdtSc datum)
       ; let lockTimeInterval = lockBetweenTimeInterval (cdtStartTime datum) (cdtEndTime datum)
-      ; let txValidityRange  = ContextsV2.txInfoValidRange info
-      ; let a = traceIfFalse "Tx Signer"    $ ContextsV2.txSignedBy info walletPkh                          -- wallet must sign it
-      ; let b = traceIfFalse "Bad In/Out"   $ isNInputs txInputs 1 && isNOutputs contTxOutputs 0            -- single input, no cont output
-      ; let c = traceIfFalse "Return Value" $ isAddrGettingPaidExactly txOutputs walletAddr validatingValue -- wallet must get the UTxO
+      ; let txValidityRange  = txInfoValidRange info
+      ; let a = traceIfFalse "Tx Signer"    $ txSignedBy' info walletPkh                          -- wallet must sign it
+      ; let b = traceIfFalse "Bad In/Out"   $ isNInputs' txInputs 1 && isNOutputs' contTxOutputs 0            -- single input, no cont output
+      ; let c = traceIfFalse "Return Value" $ isAddrGettingPaidExactly' txOutputs walletAddr validatingValue -- wallet must get the UTxO
       ; let d = traceIfFalse "Time Locking" $ isTxOutsideInterval lockTimeInterval txValidityRange          -- UTxO is not time locked
       ;         traceIfFalse "Remove Error" $ all (==(True :: Bool)) [a,b,c,d]
       }
   where
-    info :: PlutusV2.TxInfo
-    info = ContextsV2.scriptContextTxInfo context
+    info :: VaultTxInfo
+    info = scriptContextTxInfo context
 
-    txInputs :: [PlutusV2.TxInInfo]
-    txInputs = PlutusV2.txInfoInputs info
+    txInputs :: [VaultTxInInfo]
+    txInputs = txInfoInputs info
 
-    txOutputs :: [PlutusV2.TxOut]
-    txOutputs = ContextsV2.txInfoOutputs info
+    txOutputs :: [VaultTxOut]
+    txOutputs = txInfoOutputs info
 
-    contTxOutputs :: [PlutusV2.TxOut]
-    contTxOutputs = ContextsV2.getContinuingOutputs context
+    contTxOutputs :: [VaultTxOut]
+    contTxOutputs = getContinuingOutputs' context
 
     validatingValue :: PlutusV2.Value
     validatingValue =
-      case ContextsV2.findOwnInput context of
+      case findOwnInput' context of
         Nothing    -> traceError "No Input to Validate."
-        Just input -> PlutusV2.txOutValue $ PlutusV2.txInInfoResolved input
+        Just input -> txOutValue $ txInInfoResolved input
 -------------------------------------------------------------------------------
 -- | Now we need to compile the Validator.
 -------------------------------------------------------------------------------
-validator' :: PlutusV2.Validator
-validator' = PlutusV2.mkValidatorScript
-    $$(PlutusTx.compile [|| wrap ||])
- where
-    wrap = Utils.mkUntypedValidator mkValidator
+
+wrappedValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
+-- wrappedValidator = wrap mkValidator
+wrappedValidator x y z = check (mkValidator (PlutusV2.unsafeFromBuiltinData x) (PlutusV2.unsafeFromBuiltinData y) (PlutusV2.unsafeFromBuiltinData z))
+
+
+validator :: Validator
+validator = Plutonomy.optimizeUPLC $ Plutonomy.validatorToPlutus $ Plutonomy.mkValidatorScript $$(PlutusTx.compile [|| wrappedValidator ||])
+
+-- validator' :: PlutusV2.Validator
+-- validator' = PlutusV2.mkValidatorScript
+--     $$(PlutusTx.compile [|| wrap ||])
+--  where
+--     wrap = Utils.mkUntypedValidator mkValidator
 -------------------------------------------------------------------------------
 -- | The code below is required for the plutus script compile.
 -------------------------------------------------------------------------------
-script :: Scripts.Script
-script = Scripts.unValidatorScript validator'
+-- script :: Scripts.Script
+-- script = Scripts.unValidatorScript validator'
 
 lockingContractScriptShortBs :: SBS.ShortByteString
-lockingContractScriptShortBs = SBS.toShort . LBS.toStrict $ serialise script
+-- lockingContractScriptShortBs = SBS.toShort . LBS.toStrict $ serialise script
+lockingContractScriptShortBs = SBS.toShort . LBS.toStrict $ serialise validator
 
 lockingContractScript :: PlutusScript PlutusScriptV2
 lockingContractScript = PlutusScriptSerialised lockingContractScriptShortBs

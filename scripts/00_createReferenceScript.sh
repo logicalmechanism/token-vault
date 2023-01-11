@@ -23,7 +23,7 @@ lock_value=$(${cli} transaction calculate-min-required-utxo \
     --protocol-params-file tmp/protocol.json \
     --tx-out-reference-script-file ${lock_script_path} \
     --tx-out="${reference_address} + 5000000" | tr -dc '0-9')
-echo "FT Locking Min Fee" ${lock_value}
+echo "Locking Contract Min Fee" ${lock_value}
 
 # stake contract min utxo
 stake_value=$(${cli} transaction calculate-min-required-utxo \
@@ -31,7 +31,7 @@ stake_value=$(${cli} transaction calculate-min-required-utxo \
     --protocol-params-file tmp/protocol.json \
     --tx-out-reference-script-file ${stake_script_path} \
     --tx-out="${reference_address} + 5000000" | tr -dc '0-9')
-echo "FT Minting Min Fee" ${stake_value}
+echo "Staking Contract Min Fee" ${stake_value}
 
 lock_script_reference_utxo="${reference_address} + ${lock_value}"
 stake_script_reference_utxo="${reference_address} + ${stake_value}"
@@ -42,7 +42,7 @@ echo -e "\nCreating Minting Reference:\n" ${stake_script_reference_utxo}
 # exit
 #
 # reference wallet pays for the references
-echo -e "\033[0;36m Gathering UTxO Information  \033[0m"
+echo -e "\033[0;36m\nGathering UTxO Information  \033[0m"
 ${cli} query utxo \
     --testnet-magic ${testnet_magic} \
     --address ${reference_address} \
