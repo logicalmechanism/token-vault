@@ -149,11 +149,11 @@ PlutusTx.unstableMakeIsData ''CustomRedeemerType
 {-# INLINABLE mkValidator #-}
 mkValidator :: CustomDatumType -> CustomRedeemerType -> VaultScriptContext -> Bool
 mkValidator datum redeemer context = 
-  let walletPkh        = cdtPkh datum
-      walletAddr       = createAddress walletPkh (cdtSc datum)
-      lockTimeInterval = lockBetweenTimeInterval (cdtStartTime datum) (cdtEndTime datum)
-      txValidityRange  = txInfoValidRange info
-      txSigners        = txInfoSignatories info
+  let !walletPkh        = cdtPkh datum
+      !walletAddr       = createAddress walletPkh (cdtSc datum)
+      !lockTimeInterval = lockBetweenTimeInterval (cdtStartTime datum) (cdtEndTime datum)
+      !txValidityRange  = txInfoValidRange info
+      !txSigners        = txInfoSignatories info
   in case redeemer of
     {- | Remove
 
