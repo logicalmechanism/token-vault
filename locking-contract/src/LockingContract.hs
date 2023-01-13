@@ -41,7 +41,7 @@ import           UsefulFuncs
 import qualified Plutonomy
 {- |
   Author   : The Ancient Kraken
-  Copyright: 2022
+  Copyright: 2023
 -}
 -------------------------------------------------------------------------------
 -- | Min Max Data Structures
@@ -103,7 +103,8 @@ getContinuingOutputs' _ = traceError "Lf" -- "Can't get any continuing outputs"
 
 -- | Check if a transaction was signed by the given public key.
 txSignedBy' :: VaultTxInfo -> PlutusV2.PubKeyHash -> Bool
-txSignedBy' VaultTxInfo{txInfoSignatories} k = case find ((==) k) txInfoSignatories of
+txSignedBy' VaultTxInfo{txInfoSignatories} k =
+  case find ((==) k) txInfoSignatories of
     Just _  -> True
     Nothing -> False
 

@@ -43,7 +43,7 @@ import           Plutus.Script.Utils.V2.Scripts as Utils
 import           UsefulFuncs
 {-
   Author   : The Ancient Kraken
-  Copyright: 2022
+  Copyright: 2023
 -}
 -------------------------------------------------------------------------------
 -- | The only allowed pool for staking.
