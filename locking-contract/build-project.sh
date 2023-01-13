@@ -1,3 +1,8 @@
+rm locking-contract.plutus
+rm validator.addr
+rm validator.bytes
+rm validator.hash
+
 cabal build -w ghc-8.10.7
 cabal run locking-contract
 

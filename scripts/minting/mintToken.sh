@@ -15,6 +15,8 @@ mint_path="policy/policy.script"
 seller_address=$(cat ../wallets/seller-wallet/payment.addr)
 seller_pkh=$(${cli} address key-hash --payment-verification-key-file ../wallets/seller-wallet/payment.vkey)
 
+receiver_address="addr_test1qrqcwuw9ju33z2l0zayt38wsthsldyrgyt82p2p3trccucffejwnp8afwa8v58aw7dpj7hpf9dh8txr0qlksqtcsxheqhekxra"
+
 # increment the slot inside the policy
 currentSlot=$(cat ./policy/policy.script | jq .scripts[0].slot)
 nextSlot=$((${currentSlot} + 1))
@@ -28,7 +30,7 @@ cardano-cli transaction policyid --script-file ./policy/policy.script > ./policy
 
 # pid and tkn
 policy_id=$(cat policy/policy.id)
-token_name=$(echo -n "ThisIsOneStarterTokenForTesting0" | od -A n -t x1 | sed 's/ *//g' | tr -d '\n')
+token_name=$(echo -n "ThisIsOneStarterTokenForTesting4" | od -A n -t x1 | sed 's/ *//g' | tr -d '\n')
 amount=1
 
 # assets
@@ -38,10 +40,10 @@ mint_asset="${amount} ${policy_id}.${token_name}"
 utxo_value=$(${cli} transaction calculate-min-required-utxo \
     --babbage-era \
     --protocol-params-file ../tmp/protocol.json \
-    --tx-out="${seller_address} + 5000000 + ${mint_asset}" | tr -dc '0-9')
+    --tx-out="${receiver_address} + 5000000 + ${mint_asset}" | tr -dc '0-9')
 
-seller_address_out="${seller_address} + ${utxo_value} + ${mint_asset}"
-echo "Mint OUTPUT: "${seller_address_out}
+receiver_address_out="${receiver_address} + ${utxo_value} + ${mint_asset}"
+echo "Mint OUTPUT: "${receiver_address_out}
 #
 # exit
 #
@@ -74,7 +76,7 @@ FEE=$(${cli} transaction build \
     --invalid-hereafter ${final_slot} \
     --change-address ${seller_address} \
     --tx-in ${seller_tx_in} \
-    --tx-out="${seller_address_out}" \
+    --tx-out="${receiver_address_out}" \
     --required-signer-hash ${seller_pkh} \
     --mint-script-file policy/policy.script \
     --mint="${mint_asset}" \

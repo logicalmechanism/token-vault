@@ -3,7 +3,7 @@
   "scripts": [
     {
       "type": "after",
-      "slot": 21
+      "slot": 27
     },
     {
       "type": "sig",

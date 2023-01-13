@@ -37,7 +37,7 @@ lock_script_reference_utxo="${reference_address} + ${lock_value}"
 stake_script_reference_utxo="${reference_address} + ${stake_value}"
 
 echo -e "\nCreating Locking Reference:\n" ${lock_script_reference_utxo}
-echo -e "\nCreating Minting Reference:\n" ${stake_script_reference_utxo}
+echo -e "\nCreating Staking Reference:\n" ${stake_script_reference_utxo}
 #
 # exit
 #

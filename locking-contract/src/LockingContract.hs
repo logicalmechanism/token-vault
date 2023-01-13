@@ -46,10 +46,13 @@ import qualified Plutonomy
 -------------------------------------------------------------------------------
 -- | Min Max Data Structures
 -------------------------------------------------------------------------------
+data VaultOutputDatum =  NoOutputDatum | OutputDatum PlutusV2.Datum
+PlutusTx.makeIsDataIndexed ''VaultOutputDatum [('NoOutputDatum, 0), ('OutputDatum, 2)]
+
 data VaultTxOut = VaultTxOut
   { txOutAddress         :: PlutusV2.Address
   , txOutValue           :: PlutusV2.Value
-  , txOutDatum           :: PlutusV2.OutputDatum
+  , txOutDatum           :: VaultOutputDatum
   , txOutReferenceScript :: BuiltinData
   }
 PlutusTx.unstableMakeIsData ''VaultTxOut
@@ -76,17 +79,20 @@ data VaultTxInfo = VaultTxInfo
     }
 PlutusTx.unstableMakeIsData ''VaultTxInfo
 
+-- | Purpose of the script that is currently running
+data VaultScriptPurpose = Spending PlutusV2.TxOutRef
+PlutusTx.makeIsDataIndexed ''VaultScriptPurpose [('Spending, 1)]
+
 data VaultScriptContext = VaultScriptContext
   { scriptContextTxInfo :: VaultTxInfo
-  , scriptContextPurpose ::  PlutusV2.ScriptPurpose 
+  , scriptContextPurpose ::  VaultScriptPurpose 
   }
 PlutusTx.unstableMakeIsData ''VaultScriptContext
 
 -- | Find the input currently being validated.
 findOwnInput' :: VaultScriptContext -> Maybe VaultTxInInfo
-findOwnInput' VaultScriptContext{scriptContextTxInfo=VaultTxInfo{txInfoInputs}, scriptContextPurpose=PlutusV2.Spending txOutRef} =
+findOwnInput' VaultScriptContext{scriptContextTxInfo=VaultTxInfo{txInfoInputs}, scriptContextPurpose=Spending txOutRef} =
     find (\VaultTxInInfo{txInInfoOutRef} -> txInInfoOutRef == txOutRef) txInfoInputs
-findOwnInput' _ = Nothing
 
 -- | Get all the outputs that pay to the same script address we are currently spending from, if any.
 getContinuingOutputs' :: VaultScriptContext -> [VaultTxOut]
@@ -109,9 +115,8 @@ isNInputs' utxos number = loopInputs utxos 0
     loopInputs []     counter = counter == number
     loopInputs (x:xs) counter = 
       case txOutDatum $ txInInfoResolved x of
-        PlutusV2.NoOutputDatum         -> loopInputs xs   counter
-        ( PlutusV2.OutputDatumHash _ ) -> loopInputs xs ( counter + 1 ) -- embedded
-        ( PlutusV2.OutputDatum     _ ) -> loopInputs xs ( counter + 1 ) -- inline
+        NoOutputDatum    -> loopInputs xs   counter
+        (OutputDatum _ ) -> loopInputs xs ( counter + 1 ) -- inline
 
 -- | Count the number of outputs that have datums of any kind.
 isNOutputs' :: [VaultTxOut] -> Integer -> Bool
@@ -121,9 +126,8 @@ isNOutputs' utxos number = loopInputs utxos 0
     loopInputs []     counter = counter == number
     loopInputs (x:xs) counter = 
       case txOutDatum x of
-        PlutusV2.NoOutputDatum         -> loopInputs xs   counter
-        ( PlutusV2.OutputDatumHash _ ) -> loopInputs xs ( counter + 1 ) -- embedded
-        ( PlutusV2.OutputDatum     _ ) -> loopInputs xs ( counter + 1 ) -- inline
+        NoOutputDatum    -> loopInputs xs   counter
+        (OutputDatum _ ) -> loopInputs xs ( counter + 1 ) -- inline
 
 -- | Search a list of TxOut for a TxOut with a specific address that is hodling an exact amount of of a singular token. 
 isAddrGettingPaidExactly' :: [VaultTxOut] -> PlutusV2.Address -> PlutusV2.Value -> Bool
@@ -155,7 +159,7 @@ PlutusTx.unstableMakeIsData ''CustomDatumType
 -- | Create the redeemer type.
 -------------------------------------------------------------------------------
 data CustomRedeemerType = Remove
-PlutusTx.makeIsDataIndexed ''CustomRedeemerType [ ( 'Remove, 0 ) ]
+PlutusTx.unstableMakeIsData ''CustomRedeemerType
 -------------------------------------------------------------------------------
 -- | mkValidator :: Datum -> Redeemer -> ScriptContext -> Bool
 -------------------------------------------------------------------------------
@@ -171,17 +175,11 @@ mkValidator datum redeemer context =
       at a time.
       
     -}
-    Remove -> do
-      { let walletPkh        = cdtPkh datum
-      ; let walletAddr       = createAddress walletPkh (cdtSc datum)
-      ; let lockTimeInterval = lockBetweenTimeInterval (cdtStartTime datum) (cdtEndTime datum)
-      ; let txValidityRange  = txInfoValidRange info
-      ; let a = traceIfFalse "Tx Signer"    $ txSignedBy' info walletPkh                                     -- wallet must sign it
-      ; let b = traceIfFalse "Bad In/Out"   $ isNInputs' txInputs 1 && isNOutputs' contTxOutputs 0           -- single input, no cont output
-      ; let c = traceIfFalse "Return Value" $ isAddrGettingPaidExactly' txOutputs walletAddr validatingValue -- wallet must get the UTxO
-      ; let d = traceIfFalse "Time Locking" $ isTxOutsideInterval lockTimeInterval txValidityRange           -- UTxO is not time locked
-      ;         traceIfFalse "Remove Error" $ all (==(True :: Bool)) [a,b,c,d]
-      }
+    Remove -> txSignedBy' info (cdtPkh datum)
+           && isNInputs' txInputs 1
+           && isNOutputs' contTxOutputs 0
+           && isAddrGettingPaidExactly' txOutputs (createAddress (cdtPkh datum) (cdtSc datum)) validatingValue
+           && isTxOutsideInterval (lockBetweenTimeInterval (cdtStartTime datum) (cdtEndTime datum)) (txInfoValidRange info)
   where
     info :: VaultTxInfo
     info = scriptContextTxInfo context
@@ -206,10 +204,9 @@ mkValidator datum redeemer context =
 wrappedValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
 wrappedValidator x y z = check (mkValidator (PlutusV2.unsafeFromBuiltinData x) (PlutusV2.unsafeFromBuiltinData y) (PlutusV2.unsafeFromBuiltinData z))
 
-
 validator :: Validator
--- validator = Plutonomy.optimizeUPLC $ Plutonomy.validatorToPlutus $ Plutonomy.mkValidatorScript $$(PlutusTx.compile [|| wrappedValidator ||])
-validator = Plutonomy.optimizeUPLCWith Plutonomy.aggressiveOptimizerOptions $ Plutonomy.validatorToPlutus $ Plutonomy.mkValidatorScript $$(PlutusTx.compile [|| wrappedValidator ||])
+validator = Plutonomy.optimizeUPLC $ Plutonomy.validatorToPlutus $ Plutonomy.mkValidatorScript $$(PlutusTx.compile [|| wrappedValidator ||])
+-- validator = Plutonomy.optimizeUPLCWith Plutonomy.aggressiveOptimizerOptions $ Plutonomy.validatorToPlutus $ Plutonomy.mkValidatorScript $$(PlutusTx.compile [|| wrappedValidator ||])
 
 lockingContractScriptShortBs :: SBS.ShortByteString
 lockingContractScriptShortBs = SBS.toShort . LBS.toStrict $ serialise validator
