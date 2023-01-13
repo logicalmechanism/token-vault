@@ -79,7 +79,6 @@ data VaultTxInfo = VaultTxInfo
     }
 PlutusTx.unstableMakeIsData ''VaultTxInfo
 
--- | Purpose of the script that is currently running
 data VaultScriptPurpose = Spending PlutusV2.TxOutRef
 PlutusTx.makeIsDataIndexed ''VaultScriptPurpose [('Spending, 1)]
 
@@ -88,49 +87,32 @@ data VaultScriptContext = VaultScriptContext
   , scriptContextPurpose ::  VaultScriptPurpose 
   }
 PlutusTx.unstableMakeIsData ''VaultScriptContext
+-------------------------------------------------------------------------------
+-- | Rebuilt Functions
+-------------------------------------------------------------------------------
+-- rewrite findOwnInput without higher order functions
+{-# inlinable ownInput #-}
+ownInput :: VaultScriptContext -> VaultTxOut
+ownInput (VaultScriptContext t_info (Spending o_ref)) = getScriptInput (txInfoInputs t_info) o_ref
 
--- | Find the input currently being validated.
-findOwnInput' :: VaultScriptContext -> Maybe VaultTxInInfo
-findOwnInput' VaultScriptContext{scriptContextTxInfo=VaultTxInfo{txInfoInputs}, scriptContextPurpose=Spending txOutRef} =
-    find (\VaultTxInInfo{txInInfoOutRef} -> txInInfoOutRef == txOutRef) txInfoInputs
-
--- | Get all the outputs that pay to the same script address we are currently spending from, if any.
-getContinuingOutputs' :: VaultScriptContext -> [VaultTxOut]
-getContinuingOutputs' ctx | Just VaultTxInInfo{txInInfoResolved=VaultTxOut{txOutAddress}} <- findOwnInput' ctx = filter (f txOutAddress) (txInfoOutputs $ scriptContextTxInfo ctx)
-    where
-        f addr VaultTxOut{txOutAddress=otherAddress} = addr == otherAddress
-getContinuingOutputs' _ = traceError "Lf" -- "Can't get any continuing outputs"
+-- get the validating script input
+{-# inlinable getScriptInput #-}
+getScriptInput :: [VaultTxInInfo] -> PlutusV2.TxOutRef -> VaultTxOut
+getScriptInput [] _ = traceError "script input not found"
+getScriptInput ((VaultTxInInfo tref ot) : tl) o_ref
+  | tref == o_ref = ot
+  | otherwise = getScriptInput tl o_ref
 
 -- | Check if a transaction was signed by the given public key.
-txSignedBy' :: VaultTxInfo -> PlutusV2.PubKeyHash -> Bool
-txSignedBy' VaultTxInfo{txInfoSignatories} k =
-  case find ((==) k) txInfoSignatories of
-    Just _  -> True
-    Nothing -> False
+{-# inlinable signedBy #-}
+signedBy :: [PlutusV2.PubKeyHash] -> PlutusV2.PubKeyHash -> Bool
+signedBy []     _ = False
+signedBy (x:xs) k
+  | x == k    = True
+  | otherwise =  signedBy xs k
 
--- | Count the number of inputs that have datums of any kind.
-isNInputs' :: [VaultTxInInfo] -> Integer -> Bool
-isNInputs' utxos number = loopInputs utxos 0
-  where
-    loopInputs :: [VaultTxInInfo] -> Integer -> Bool
-    loopInputs []     counter = counter == number
-    loopInputs (x:xs) counter = 
-      case txOutDatum $ txInInfoResolved x of
-        NoOutputDatum    -> loopInputs xs   counter
-        (OutputDatum _ ) -> loopInputs xs ( counter + 1 ) -- inline
-
--- | Count the number of outputs that have datums of any kind.
-isNOutputs' :: [VaultTxOut] -> Integer -> Bool
-isNOutputs' utxos number = loopInputs utxos 0
-  where
-    loopInputs :: [VaultTxOut] -> Integer  -> Bool
-    loopInputs []     counter = counter == number
-    loopInputs (x:xs) counter = 
-      case txOutDatum x of
-        NoOutputDatum    -> loopInputs xs   counter
-        (OutputDatum _ ) -> loopInputs xs ( counter + 1 ) -- inline
-
--- | Search a list of TxOut for a TxOut with a specific address that is hodling an exact amount of of a singular token. 
+-- | Search a list of TxOut for a TxOut with a specific address that is hodling an exact value.
+{-# inlinable isAddrGettingPaidExactly' #-}
 isAddrGettingPaidExactly' :: [VaultTxOut] -> PlutusV2.Address -> PlutusV2.Value -> Bool
 isAddrGettingPaidExactly' []     _    _   = False
 isAddrGettingPaidExactly' (x:xs) addr val
@@ -141,7 +123,7 @@ isAddrGettingPaidExactly' (x:xs) addr val
     checkAddr = txOutAddress x == addr
 
     checkVal :: Bool
-    checkVal = txOutValue x == val     -- must be exact
+    checkVal = txOutValue x == val
 -------------------------------------------------------------------------------
 -- | Create the datum parameters data object.
 -------------------------------------------------------------------------------
@@ -166,8 +148,13 @@ PlutusTx.unstableMakeIsData ''CustomRedeemerType
 -------------------------------------------------------------------------------
 {-# INLINABLE mkValidator #-}
 mkValidator :: CustomDatumType -> CustomRedeemerType -> VaultScriptContext -> Bool
-mkValidator datum redeemer context =
-  case redeemer of
+mkValidator datum redeemer context = 
+  let walletPkh        = cdtPkh datum
+      walletAddr       = createAddress walletPkh (cdtSc datum)
+      lockTimeInterval = lockBetweenTimeInterval (cdtStartTime datum) (cdtEndTime datum)
+      txValidityRange  = txInfoValidRange info
+      txSigners        = txInfoSignatories info
+  in case redeemer of
     {- | Remove
 
       A user may remove their staked UTxO if and only if they provide the correct signature,
@@ -176,29 +163,18 @@ mkValidator datum redeemer context =
       at a time.
       
     -}
-    Remove -> txSignedBy' info (cdtPkh datum)
-           && isNInputs' txInputs 1
-           && isNOutputs' contTxOutputs 0
-           && isAddrGettingPaidExactly' txOutputs (createAddress (cdtPkh datum) (cdtSc datum)) validatingValue
-           && isTxOutsideInterval (lockBetweenTimeInterval (cdtStartTime datum) (cdtEndTime datum)) (txInfoValidRange info)
+    Remove -> signedBy txSigners walletPkh
+           && isAddrGettingPaidExactly' txOutputs walletAddr validatingValue
+           && isTxOutsideInterval lockTimeInterval txValidityRange
   where
     info :: VaultTxInfo
     info = scriptContextTxInfo context
 
-    txInputs :: [VaultTxInInfo]
-    txInputs = txInfoInputs info
-
     txOutputs :: [VaultTxOut]
     txOutputs = txInfoOutputs info
 
-    contTxOutputs :: [VaultTxOut]
-    contTxOutputs = getContinuingOutputs' context
-
     validatingValue :: PlutusV2.Value
-    validatingValue =
-      case findOwnInput' context of
-        Nothing    -> traceError "No Input to Validate."
-        Just input -> txOutValue $ txInInfoResolved input
+    validatingValue = txOutValue $ ownInput context
 -------------------------------------------------------------------------------
 -- | Now we need to compile the Validator.
 -------------------------------------------------------------------------------
